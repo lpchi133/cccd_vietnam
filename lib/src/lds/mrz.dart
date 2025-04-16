@@ -44,7 +44,7 @@ class MRZ {
 
   String toEncodedString() {
     var data = toBytes();
-    final inputStream = InputStream(data);
+    final inputStream = ByteInputStream(data, byteOrder: ByteOrder.bigEndian);
     var result = _read(inputStream, data.length);
 
     return result;
@@ -52,29 +52,48 @@ class MRZ {
 
   static int calculateCheckDigit(String checkString) {
     const charMap = {
-      "0" :  "0",  "1" :  "1",
-      "2" :  "2",  "3" :  "3",
-      "4" :  "4",  "5" :  "5",
-      "6" :  "6",  "7" :  "7",
-      "8" :  "8",  "9" :  "9",
-      "<" :  "0",  " " :  "0",
-      "A" : "10",  "B" : "11",
-      "C" : "12",  "D" : "13",
-      "E" : "14",  "F" : "15",
-      "G" : "16",  "H" : "17",
-      "I" : "18",  "J" : "19",
-      "K" : "20",  "L" : "21",
-      "M" : "22",  "N" : "23",
-      "O" : "24",  "P" : "25",
-      "Q" : "26",  "R" : "27",
-      "S" : "28",  "T" : "29",
-      "U" : "30",  "V" : "31",
-      "W" : "32",  "X" : "33",
-      "Y" : "34",  "Z" : "35"
+      "0": "0",
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "<": "0",
+      " ": "0",
+      "A": "10",
+      "B": "11",
+      "C": "12",
+      "D": "13",
+      "E": "14",
+      "F": "15",
+      "G": "16",
+      "H": "17",
+      "I": "18",
+      "J": "19",
+      "K": "20",
+      "L": "21",
+      "M": "22",
+      "N": "23",
+      "O": "24",
+      "P": "25",
+      "Q": "26",
+      "R": "27",
+      "S": "28",
+      "T": "29",
+      "U": "30",
+      "V": "31",
+      "W": "32",
+      "X": "33",
+      "Y": "34",
+      "Z": "35"
     };
 
     var sum = 0;
-    var m   = 0;
+    var m = 0;
     const multipliers = [7, 3, 1];
     for (int i = 0; i < checkString.length; i++) {
       final lookup = charMap[checkString[i]];
@@ -91,7 +110,7 @@ class MRZ {
   }
 
   void _parse(Uint8List data) {
-    final istream = InputStream(data);
+    final istream = ByteInputStream(data);
     if (data.length == 90) {
       version = MRZVersion.td1;
       _parseTD1(istream);
@@ -269,4 +288,73 @@ class MRZ {
       throw MRZParseError(errorMsg);
     }
   }
+}
+
+class ByteInputStream extends InputStream {
+  final Uint8List _data;
+  int _position = 0;
+
+  ByteInputStream(this._data, {super.byteOrder = ByteOrder.bigEndian});
+
+  @override
+  int get position => _position;
+
+  @override
+  set position(int v) {
+    _position = v;
+  }
+
+  @override
+  int get length => _data.length - _position;
+
+  @override
+  bool get isEOS => _position >= _data.length;
+
+  @override
+  bool open() => true;
+
+  @override
+  Future<void> close() async {}
+
+  @override
+  void closeSync() {}
+
+  @override
+  void reset() {
+    _position = 0;
+  }
+
+  @override
+  void setPosition(int v) {
+    _position = v;
+  }
+
+  @override
+  void rewind([int length = 1]) {
+    _position = (_position - length).clamp(0, _data.length);
+  }
+
+  @override
+  void skip(int length) {
+    _position = (_position + length).clamp(0, _data.length);
+  }
+
+  @override
+  int readByte() {
+    if (isEOS) throw Exception('End of stream');
+    return _data[_position++];
+  }
+
+  @override
+  InputStream subset({int? position, int? length, int? bufferSize}) {
+    final start = position ?? _position;
+    final end = (length != null) ? (start + length) : _data.length;
+    return ByteInputStream(
+      _data.sublist(start, end),
+      byteOrder: byteOrder,
+    );
+  }
+
+  @override
+  Uint8List toUint8List() => _data.sublist(_position);
 }
